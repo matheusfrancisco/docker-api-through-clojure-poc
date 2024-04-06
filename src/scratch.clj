@@ -78,13 +78,13 @@
                                            :stdout true
                                            :stderr true}})
         ; copy files from conatiner to host 
-        containers-files (rt/request {:client (rt/client "unix:///var/run/docker.sock" {})
-                                      :method :get
-                                      :path (str "/v1.44/containers/" container-name "/archive")
-                                      :query-params {:path "/usr/src/app/diff.txt"}
-                                      :as :stream
-                                      :throw-exceptions true
-                                      :throw-entire-message true})
+        #_#_containers-files (rt/request {:client (rt/client "unix:///var/run/docker.sock" {})
+                                          :method :get
+                                          :path (str "/v1.44/containers/" container-name "/archive")
+                                          :query-params {:path "/usr/src/app/diff.txt"}
+                                          :as :stream
+                                          :throw-exceptions true
+                                          :throw-entire-message true})
 
         ; Delete clojure stopped containers
         container-prune-result (c/invoke containers-docker
@@ -98,8 +98,10 @@
      :container-wait-result container-wait-result
      :container-logs container-logs
      :container-prune-result container-prune-result
-     :containers-files containers-files}))
+     #_#_:containers-files containers-files}))
 
 (clojure.pprint/pprint result)
-(clojure.pprint/pprint (-> result :containers-files (slurp) str))
+(clojure.pprint/pprint (:container-logs result))
+#_(clojure.pprint/pprint (-> result :containers-files (slurp) str))
+(clojure.string/replace (:container-logs result) #"[^\x20-\x7E]" "")
 

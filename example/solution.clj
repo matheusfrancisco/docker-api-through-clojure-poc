@@ -1,10 +1,14 @@
 (ns solution
-  (:require [clojure.string :as str]))
+  (:require
+   [clojure.pprint :as pprint]))
+
+(defn avg-fn [a b c]
+  (/ (+ (* a 2.0) (* b 3.0) (* c 5.0)) 10.0))
 
 (defn main []
   (let [a (Double/parseDouble (read-line))
         b (Double/parseDouble (read-line))
         c (Double/parseDouble (read-line))]
-    (format "%.1f" (/ (+ (* a 2.0) (* b 3.0) (* c 5.0)) 10.0))))
+    {#{a, b, c} (format "%.1f" (avg-fn a b c))}))
 
-(println "MEDIA =" (main))
+(pprint/pprint (main))
