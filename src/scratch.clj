@@ -42,48 +42,64 @@
                                    :throw-exceptions true
                                    :throw-entire-message true})))
 
-(let [image-name "clojure:temurin-11-tools-deps"
-      image-results (download-and-wait-image image-name)
-      image-pulled (image-pulled? image-name)
-      container-name "clojure"
+(def result
+  (let [image-name "clojure:temurin-11-tools-deps"
+        image-results (download-and-wait-image image-name)
+        image-pulled (image-pulled? image-name)
+        container-name "clojure"
       ; Create clojure container
-      container-create-result (c/invoke containers-docker
-                                        {:op   :ContainerCreate
-                                         :params {:name container-name}
-                                         :data {:Image image-name
-                                                :WorkingDir "/usr/src/app"
-                                                :Cmd  ["clojure" "-M" "solution.clj"]}})
+        container-create-result (c/invoke containers-docker
+                                          {:op   :ContainerCreate
+                                           :params {:name container-name}
+                                           :data {:Image image-name
+                                                  :WorkingDir "/usr/src/app"
+                                                  :Cmd  ["/bin/sh", "run-clj.sh"]
+                                                  #_["clojure" "-M" "solution.clj" "< in.txt" "> result-clj.txt"]}})
       ; Add files to created container
       ; tar --no-xattr --no-mac-metadata -czvf src.tar.gz -C example .
-      add-files-result (rt/request {:client (rt/client "unix:///var/run/docker.sock" {})
-                                    :method :put
-                                    :path   "/v1.44/containers/clojure/archive"
-                                    :query-params {:path "/usr/src/app"}
-                                    :body (-> "src.tar.gz"
-                                              io/file
-                                              io/input-stream)})
+        add-files-result (rt/request {:client (rt/client "unix:///var/run/docker.sock" {})
+                                      :method :put
+                                      :path   "/v1.44/containers/clojure/archive"
+                                      :query-params {:path "/usr/src/app"}
+                                      :body (-> "src.tar.gz"
+                                                io/file
+                                                io/input-stream)})
       ; Container start
-      container-start-result (c/invoke containers-docker
-                                       {:op     :ContainerStart
-                                        :params {:id container-name}})
+        container-start-result (c/invoke containers-docker
+                                         {:op     :ContainerStart
+                                          :params {:id container-name}})
       ; Wait container stop
-      container-wait-result (c/invoke containers-docker {:op     :ContainerWait
-                                                         :params {:id container-name}})
+        container-wait-result (c/invoke containers-docker {:op     :ContainerWait
+                                                           :params {:id container-name}})
       ; Get container logs
-      container-logs (c/invoke containers-docker
-                               {:op     :ContainerLogs
-                                :params {:id container-name
-                                         :stdout true
-                                         :stderr true}})
-            ; Delete clojure stopped containers
-      container-prune-result (c/invoke containers-docker
-                                       {:op     :ContainerPrune
-                                        :params {:name container-name}})]
-  {:image-results image-results
-   :image-pulled image-pulled
-   :container-create-result container-create-result
-   :add-files-result add-files-result
-   :container-start-result container-start-result
-   :container-wait-result container-wait-result
-   :container-logs container-logs
-   :container-prune-result container-prune-result})
+        container-logs (c/invoke containers-docker
+                                 {:op     :ContainerLogs
+                                  :params {:id container-name
+                                           :stdout true
+                                           :stderr true}})
+        ; copy files from conatiner to host 
+        containers-files (rt/request {:client (rt/client "unix:///var/run/docker.sock" {})
+                                      :method :get
+                                      :path (str "/v1.44/containers/" container-name "/archive")
+                                      :query-params {:path "/usr/src/app/diff.txt"}
+                                      :as :stream
+                                      :throw-exceptions true
+                                      :throw-entire-message true})
+
+        ; Delete clojure stopped containers
+        container-prune-result (c/invoke containers-docker
+                                         {:op     :ContainerPrune
+                                          :params {:name container-name}})]
+    {:image-results image-results
+     :image-pulled image-pulled
+     :container-create-result container-create-result
+     :add-files-result add-files-result
+     :container-start-result container-start-result
+     :container-wait-result container-wait-result
+     :container-logs container-logs
+     :container-prune-result container-prune-result
+     :containers-files containers-files}))
+
+(clojure.pprint/pprint result)
+(clojure.pprint/pprint (-> result :containers-files (slurp) str))
+
