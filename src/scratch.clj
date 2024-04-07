@@ -1,8 +1,67 @@
 (ns scratch
-  (:require [clojure.data.json :as json]
-            [clojure.java.io :as io]
-            [contajners.core :as c]
-            [contajners.jvm-runtime :as rt]))
+  (:require
+   [clojure.data.json :as json]
+   [clojure.java.io :as io]
+   [code :refer [merged-code]]
+   [contajners.core :as c]
+   [contajners.jvm-runtime :as rt])
+  (:import
+   [java.io ByteArrayInputStream ByteArrayOutputStream]
+   [java.nio.charset StandardCharsets]
+   [java.util.zip GZIPInputStream GZIPOutputStream]
+   (org.apache.commons.compress.archivers.tar TarArchiveEntry TarArchiveInputStream TarArchiveOutputStream)))
+
+(defn create-tar-gz-in-memory
+  "Creates a .tar.gz file in memory. `files` is a map of file names to their string contents."
+  [files]
+  (let [baos (ByteArrayOutputStream.)
+        gzos (GZIPOutputStream. baos)
+        taos (TarArchiveOutputStream. gzos)]
+    (doseq [[filename content] files]
+      (let [entry (TarArchiveEntry. filename)
+            content-bytes (.getBytes content)]
+        (.setSize entry (count content-bytes))
+        (.putArchiveEntry taos entry)
+        (.write taos content-bytes)
+        (.closeArchiveEntry taos)))
+    (.finish taos)
+    (.close gzos)
+    (.toByteArray baos)))
+
+(def tarcode (create-tar-gz-in-memory {"solution.clj" merged-code
+                                       "in.txt" "1\n2\n3\n"}))
+
+;write tarcode to file
+(defn write-tarcode-to-file [tarcode]
+  (with-open [out (io/output-stream "src2.tar.gz")]
+    (.write out tarcode)))
+#_(write-tarcode-to-file tarcode)
+
+(defn untar-gz-in-memory-and-decode
+  "Untars a .tar.gz byte array `tar-gz-bytes`, decodes contents using UTF-8, and returns a map of file paths to String contents."
+  [tar-gz-bytes]
+  (with-open [bais (ByteArrayInputStream. tar-gz-bytes)
+              gzis (GZIPInputStream. bais)
+              tais (TarArchiveInputStream. gzis)]
+    (let [entries (atom {})]
+      (loop []
+        (let [entry (.getNextTarEntry tais)]
+          (when entry
+            (let [entry-name (.getName entry)]
+              (when-not (.isDirectory entry)
+                (let [baos (ByteArrayOutputStream.)
+                      buffer (byte-array 1024)] ; buffer size for reading
+                  (loop []
+                    (let [len (.read tais buffer)]
+                      (when (pos? len)
+                        (.write baos buffer 0 len)
+                        (recur))))
+                  (let [content-string (String. (.toByteArray baos) StandardCharsets/UTF_8)]
+                    (swap! entries assoc entry-name content-string)))))
+            (recur))))
+      @entries)))
+
+#_(untar-gz-in-memory-and-decode tarcode)
 
 (def images-docker (c/client {:engine   :docker
                               :category :images
@@ -53,17 +112,18 @@
                                            :params {:name container-name}
                                            :data {:Image image-name
                                                   :WorkingDir "/usr/src/app"
-                                                  :Cmd  ["/bin/sh", "run-clj.sh"]
-                                                  #_["clojure" "-M" "solution.clj" "< in.txt" "> result-clj.txt"]}})
+                                                  #_#_:Cmd  ["/bin/sh", "run-clj.sh"]
+                                                  :Cmd ["clojure" "-M" "./solution.clj" "< in.txt" #_"> result-clj.txt"]}})
       ; Add files to created container
       ; tar --no-xattr --no-mac-metadata -czvf src.tar.gz -C example .
         add-files-result (rt/request {:client (rt/client "unix:///var/run/docker.sock" {})
                                       :method :put
                                       :path   "/v1.44/containers/clojure/archive"
                                       :query-params {:path "/usr/src/app"}
-                                      :body (-> "src.tar.gz"
-                                                io/file
-                                                io/input-stream)})
+                                      :body #_(-> tarcode io/input-stream)
+                                      (-> "src2.tar.gz"
+                                          io/file
+                                          io/input-stream)})
       ; Container start
         container-start-result (c/invoke containers-docker
                                          {:op     :ContainerStart
@@ -103,5 +163,5 @@
 (clojure.pprint/pprint result)
 (clojure.pprint/pprint (:container-logs result))
 #_(clojure.pprint/pprint (-> result :containers-files (slurp) str))
-(clojure.string/replace (:container-logs result) #"[^\x20-\x7E]" "")
+#_(clojure.string/replace (:container-logs result) #"[^\x20-\x7E]" "")
 

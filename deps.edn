@@ -1,5 +1,7 @@
 {:paths ["src"]
  :deps  {org.clojure/clojure {:mvn/version "1.11.2"}
+
+         org.apache.commons/commons-compress {:mvn/version "1.5"}
          org.clojars.lispyclouds/contajners {:mvn/version "1.0.5"}}
 
  :aliases {:nrepl {:extra-deps {cider/cider-nrepl {:mvn/version "0.47.0"}}
