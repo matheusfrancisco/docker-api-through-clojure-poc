@@ -9,12 +9,13 @@
 (defn avg-fn [a b c]
   (/ (+ (* a 2.0) (* b 3.0) (* c 5.0)) 10.0))
 
+
 (defn main []
   (let [n (Double/parseDouble (read-line))]
     (loop [i 1]
       (when (<= i n)
         (let [s (string/split (read-line) #",")
-              input (mapv #(Double/parseDouble %) s)
+              input (mapv (fn [i] (Double/parseDouble i)) s)
               [a b c] input]
           (pprint/pprint {:test-case i
                           :result (avg-fn a b c)}))

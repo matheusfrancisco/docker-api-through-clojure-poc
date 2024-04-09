@@ -22,10 +22,7 @@
         (.write taos content-bytes)
         (.closeArchiveEntry taos)))
     (.finish taos)
-    (finally
-      (.close taos)
-      (.close gzos)
-      (.close baos))
+    (.close gzos)
     (.toByteArray baos)))
 
 (def tarcode (create-tar-gz-in-memory {"solution.clj" submitted-code-snippet
@@ -35,7 +32,7 @@
 (defn write-tarcode-to-file [tarcode]
   (with-open [out (io/output-stream "src2.tar.gz")]
     (.write out tarcode)))
-#_(write-tarcode-to-file tarcode)
+(write-tarcode-to-file tarcode)
 
 (defn untar-gz-in-memory-and-decode
   "Untars a .tar.gz byte array `tar-gz-bytes`, decodes contents using UTF-8, and returns a map of file paths to String contents."
