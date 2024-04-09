@@ -14,7 +14,7 @@
   (let [n (Double/parseDouble (read-line))]
     (loop [i 1]
       (when (<= i n)
-        (let [s (string/split (read-line) #",")
+        (let [s (string/split (read-line) #\",\")
               input (mapv (fn [i] (Double/parseDouble i)) s)
               [a b c] input]
           (pprint/pprint {:test-case i
